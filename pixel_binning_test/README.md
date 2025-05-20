@@ -1,1 +1,0 @@
-/Users/ccc/Library/CloudStorage/GoogleDrive-abc332241@gmail.com/我的雲端硬碟/Obsidian Vault/ALMA_project/script/exportfits_AlmaAca.py.md
