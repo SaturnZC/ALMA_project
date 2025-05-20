@@ -1,7 +1,7 @@
 # 目前僅忽略 macOS 的 .DS\_Store 檔案
 
 .DS\_Store
-datacube/
+datacubes/
 
 # 以下為可選擇啟用的忽略規則：
 
