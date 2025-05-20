@@ -6,12 +6,14 @@ git pull origin main
 git add .
 git commit -m "你的更新說明"
 git push
+
+ ~/copy_readme.sh #copy log from obsidian to ALMA_project
 ```
 
 
 
 - 2025/5/20:  
-	- 
+	- 增加切出特定區域功能
 - 2025/5/19:  
 	- 建立script，設定3種bin的方式1x1,2x2,3x3測試，並無明顯提升，老師建議加大bin size 並選擇背景雜訊區。
 	- [[compare_bin_size1.png]]  
