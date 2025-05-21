@@ -8,7 +8,8 @@ git add .
 git commit -m "Your update description"
 git push
 
-~/copy_readme.sh # copy log from obsidian to ALMA_project
+~/copy_pixel_binning_log_readme.sh  
+# copy this log from Obsidian to ALMA_project readme.md
 ```
 
 - 2025/5/21:  
