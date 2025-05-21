@@ -14,6 +14,7 @@ git push
 
 - 2025/5/22:  
 	- rest frequency problem.
+	- add theoretical rms line
 - 2025/5/21:  
 	- delete the bin size change the bin size to 1, 5, 10
 	- add Plot RMS diagram
