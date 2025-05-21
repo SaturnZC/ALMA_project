@@ -17,6 +17,7 @@ git push
 - 2025/5/20:  
 	- Add region-cutting function
 - 2025/5/19:  
-	- Establish script, set up three bin sizes (1x1, 2x2, 3x3) testing, no significant improvement, teacher suggests increasing bin size and choosing background noise area.
-	- [[compare_bin_size1.png]]  
-	- [[Spectral_Comparison1.png]]
+	- Establish script, set up three bin sizes (1x1, 2x2, 3x3) testing, no significant improvement, teacher suggests increasing bin size and choosing background noise area.  
+	- [Spectral_Comparison1.png](./figure/Spectral_Comparison1.png)
+	- [compare_bin_size1.png](./figure/compare_bin_size1.png)
+
