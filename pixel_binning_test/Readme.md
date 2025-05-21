@@ -13,9 +13,11 @@ git push
 ```
 
 - 2025/5/21:  
-	- 
+	- delete  the bin size 2,3, is only {1,5,10} now
 - 2025/5/20:  
 	- Add region-cutting function
+	- saw some pattern on the frequency 1200~1500 monment 0 map in spw0
+	- [spw0_12001500](./figure/spw0_12001500.png)
 - 2025/5/19:  
 	- Establish script, set up three bin sizes (1x1, 2x2, 3x3) testing, no significant improvement, teacher suggests increasing bin size and choosing background noise area.  
 	- [Spectral_Comparison1.png](./figure/Spectral_Comparison1.png)
