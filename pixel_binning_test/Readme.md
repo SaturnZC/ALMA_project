@@ -12,8 +12,11 @@ git push
 # copy this log from Obsidian to ALMA_project readme.md
 ```
 
+- 2025/5/22:  
+	- rest frequency problem.
 - 2025/5/21:  
-	- delete  the bin size {2,3}, is only {1,5,10} now
+	- delete the bin size change the bin size to 1, 5, 10
+	- add Plot RMS diagram
 - 2025/5/20:  
 	- Add region-cutting function
 	- saw some pattern on the  moment 0 map in spw0
