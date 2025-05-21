@@ -1,20 +1,21 @@
+
 ```bash
 cd /Users/ccc/Desktop/research/baobab/ALMA_project
 git pull origin main
-# 然後再 git push
+# Then again git push
 
 git add .
-git commit -m "你的更新說明"
+git commit -m "Your update description"
 git push
 
- ~/copy_readme.sh #copy log from obsidian to ALMA_project
+~/copy_readme.sh # copy log from obsidian to ALMA_project
 ```
 
-
-
+- 2025/5/21:  
+	- 
 - 2025/5/20:  
-	- 增加切出特定區域功能
+	- Add region-cutting function
 - 2025/5/19:  
-	- 建立script，設定3種bin的方式1x1,2x2,3x3測試，並無明顯提升，老師建議加大bin size 並選擇背景雜訊區。
+	- Establish script, set up three bin sizes (1x1, 2x2, 3x3) testing, no significant improvement, teacher suggests increasing bin size and choosing background noise area.
 	- [[compare_bin_size1.png]]  
-	- [[Spectral_Comparison1.png]]   
+	- [[Spectral_Comparison1.png]]
