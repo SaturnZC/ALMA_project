@@ -15,6 +15,10 @@ git push
 - 2025/5/22:  
 	- rest frequency problem.
 	- add theoretical rms line
+	- [spw0_bg_0](./figure/spw0_bg_0.png)
+	- [spw0_binning_size_compare](./figure/spw0_binning_size_compare.png)
+	- [Spectral_comparison_0](./figure/Spectral_comparison_0.png)
+	- [rms_binning_size0](./figure/rms_binning_size0.png)
 - 2025/5/21:  
 	- delete the bin size change the bin size to 1, 5, 10
 	- add Plot RMS diagram
