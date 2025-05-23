@@ -1,14 +1,7 @@
-
-```bash
-cd /Users/ccc/Desktop/research/baobab/ALMA_project
-git pull origin main
-# Then again git push
-
-git add .
-git commit -m "Your update description"
-git push
-
+```
 ~/copy_pixel_binning_log_readme.sh  
+```
+
 # copy this log from Obsidian to ALMA_project readme.md
 ```
 
