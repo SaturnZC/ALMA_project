@@ -2,6 +2,7 @@
 
 .DS\_Store
 datacubes/
+.pickle
 
 # 以下為可選擇啟用的忽略規則：
 
