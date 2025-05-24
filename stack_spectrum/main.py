@@ -299,3 +299,4 @@ class spectraAna:
                 average_intensity.append(temp)
 
             return average_intensity
+
