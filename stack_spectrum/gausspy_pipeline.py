@@ -23,7 +23,7 @@ class GausspyPipeline:
         snr_thresh=3.0,
         plot_max=10,
         plot_dpi=100,
-        stack_vrange=(-100, 100),
+        stack_vrange=(-200, 200),
         stack_dv=0.2,
         normalize=False,
         min_valid_spectra=30
