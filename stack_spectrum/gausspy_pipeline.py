@@ -295,3 +295,5 @@ class GausspyPipeline:
         Return current pipeline parameter settings as a dict.
         """
         return self.__dict__
+
+    
