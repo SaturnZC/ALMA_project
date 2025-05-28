@@ -20,7 +20,7 @@ class GausspyPipeline:
         alpha1=0.1,
         alpha2=12.0,
         snr_thresh=3.0,
-        plot_max=10,
+        plot_max=100,
         plot_dpi=100,
         stack_vrange=(-200, 200),
         stack_dv=0.2,
