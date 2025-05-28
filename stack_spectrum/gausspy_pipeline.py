@@ -69,6 +69,7 @@ class GausspyPipeline:
         ny, nx = subcube.shape[1:]
         spectra_list = []
         errors_list = []
+        locations = []
 
         for j in range(ny):
             for i in range(nx):
@@ -76,11 +77,13 @@ class GausspyPipeline:
                 rms = np.nanstd(spec)
                 spectra_list.append(spec)
                 errors_list.append(np.full_like(spec, rms))
+                locations.append((self.y1 + j, self.x1 + i))  # 儲存對應的 pixel 全域座標
 
         output = {
             'x_values': [velo] * len(spectra_list),
             'data_list': spectra_list,
-            'errors': errors_list
+            'errors': errors_list,
+            'location': locations 
         }
 
         with open(self.input_pickle, 'wb') as f:
@@ -88,25 +91,85 @@ class GausspyPipeline:
 
         print(f"Prepared {len(spectra_list)} spectra → {self.input_pickle}")
 
+
+    # def run_decomposition(self):
+    #     """
+    #     Runs GaussPy phase-two decomposition using the pre-saved spectra pickle.
+    #     """
+    #     from gausspy.gp import GaussianDecomposer
+    #     g = GaussianDecomposer()
+    #     g.set('phase', 'two')
+    #     g.set('alpha1', self.alpha1)
+    #     g.set('alpha2', self.alpha2)
+    #     g.set('SNR_thresh', [self.snr_thresh, self.snr_thresh])
+
+    #     print("Running GaussPy phase-two decomposition ...")
+    #     result = g.batch_decomposition(self.input_pickle)
+
+    #     with open(self.result_pickle, 'wb') as f:
+    #         pickle.dump(result, f)
+
+    #     print(f"GaussPy decomposition finished → {self.result_pickle}")
+    #     print(f"Result keys: {list(result.keys())}")
+    
     def run_decomposition(self):
         """
-        Runs GaussPy phase-two decomposition using the pre-saved spectra pickle.
+        Workaround: Use single-spectrum fit loop due to GaussPy batch bug.
         """
         from gausspy.gp import GaussianDecomposer
+        import pickle
+
+        with open(self.input_pickle, 'rb') as f:
+            d = pickle.load(f)
+
         g = GaussianDecomposer()
         g.set('phase', 'two')
         g.set('alpha1', self.alpha1)
         g.set('alpha2', self.alpha2)
         g.set('SNR_thresh', [self.snr_thresh, self.snr_thresh])
 
-        print("Running GaussPy phase-two decomposition ...")
-        result = g.batch_decomposition(self.input_pickle)
+        results = {
+            'amplitudes_fit': [],
+            'means_fit': [],
+            'stddevs_fit': [],
+            'fwhms_fit': [],
+            'aic_fit': [],
+            'bic_fit': [],
+            'N_components': []
+        }
+
+        for idx in range(len(d['x_values'])):
+            test_one = {
+                'x_values': [d['x_values'][idx]],
+                'data_list': [d['data_list'][idx]],
+                'errors': [d['errors'][idx]]
+            }
+            pickle.dump(test_one, open('test_one_spec.pickle', 'wb'))
+            try:
+                result = g.batch_decomposition('test_one_spec.pickle')
+                results['amplitudes_fit'].append(result['amplitudes_fit'][0])
+                results['means_fit'].append(result['means_fit'][0])
+                results['stddevs_fit'].append(result['stddevs_fit'][0])
+                results['fwhms_fit'].append(result['fwhms_fit'][0])
+                results['aic_fit'].append(result['aic_fit'][0])
+                results['bic_fit'].append(result['bic_fit'][0])
+                results['N_components'].append(result['N_components'][0])
+            except Exception as e:
+                print(f"   --> ERROR: {e} (spectrum #{idx})")
+                results['amplitudes_fit'].append(None)
+                results['means_fit'].append(None)
+                results['stddevs_fit'].append(None)
+                results['fwhms_fit'].append(None)
+                results['aic_fit'].append(None)
+                results['bic_fit'].append(None)
+                results['N_components'].append(0)
 
         with open(self.result_pickle, 'wb') as f:
-            pickle.dump(result, f)
+            pickle.dump(results, f)
 
         print(f"GaussPy decomposition finished → {self.result_pickle}")
-        print(f"Result keys: {list(result.keys())}")
+        print(f"Fit spectra: {len(results['amplitudes_fit'])} / {len(d['x_values'])}")
+
 
     def count_fits(self):
         """
@@ -127,7 +190,48 @@ class GausspyPipeline:
         print(f"Total: {n_total}, Success: {n_success}, Failed: {len(failed_indices)}")
         print(f"Success rate: {success_rate:.1f}%")
         return failed_indices
+    
+    
+    def classify_fit_results(self, output_pickle='fit_result_dic.pickle'):
+        """
+        分類所有 pixel 的高斯擬合結果為單峰、多峰、失敗
+        並儲存 index, location, amps, means, sigmas
+        """
+        with open(self.input_pickle, 'rb') as f:
+            data = pickle.load(f)
+        with open(self.result_pickle, 'rb') as f:
+            result = pickle.load(f)
 
+        fit_result_dic = {'s':[], 'm':[], 'f':[]}
+
+        for i, (loc, amps, means, sigmas) in enumerate(zip(
+            data['location'],
+            result['amplitudes_fit'],
+            result['means_fit'],
+            result['stddevs_fit'])):
+            loc = tuple(loc)
+            peak_num = len(means) if means is not None else 0
+            pixel_dict = {
+                "index": i,
+                "location": loc,
+                "amps": amps,
+                "means": means,
+                "sigmas": sigmas,
+            }
+
+            if peak_num == 0:
+                fit_result_dic['f'].append(pixel_dict)
+            elif peak_num == 1:
+                fit_result_dic['s'].append(pixel_dict)
+            else:
+                fit_result_dic['m'].append(pixel_dict)
+
+        # 儲存到 pickle
+        with open(output_pickle, 'wb') as f:
+            pickle.dump(fit_result_dic, f)
+        print(f"已儲存 fit 結果分類於 {output_pickle}")
+        return fit_result_dic
+    
     def stack_raw_spectra(self, plot=True):
         """
         Stack (average) all raw spectra without any shifting.
