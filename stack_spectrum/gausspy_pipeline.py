@@ -22,7 +22,7 @@ class GausspyPipeline:
         snr_thresh=3.0,
         plot_max=100,
         plot_dpi=100,
-        stack_vrange=(-200, 200),
+        stack_vrange=(-500, 500),
         stack_dv=0.2,
         normalize=False,
         min_valid_spectra=30
@@ -92,83 +92,26 @@ class GausspyPipeline:
         print(f"Prepared {len(spectra_list)} spectra → {self.input_pickle}")
 
 
-    # def run_decomposition(self):
-    #     """
-    #     Runs GaussPy phase-two decomposition using the pre-saved spectra pickle.
-    #     """
-    #     from gausspy.gp import GaussianDecomposer
-    #     g = GaussianDecomposer()
-    #     g.set('phase', 'two')
-    #     g.set('alpha1', self.alpha1)
-    #     g.set('alpha2', self.alpha2)
-    #     g.set('SNR_thresh', [self.snr_thresh, self.snr_thresh])
-
-    #     print("Running GaussPy phase-two decomposition ...")
-    #     result = g.batch_decomposition(self.input_pickle)
-
-    #     with open(self.result_pickle, 'wb') as f:
-    #         pickle.dump(result, f)
-
-    #     print(f"GaussPy decomposition finished → {self.result_pickle}")
-    #     print(f"Result keys: {list(result.keys())}")
-    
     def run_decomposition(self):
         """
-        Workaround: Use single-spectrum fit loop due to GaussPy batch bug.
+        Runs GaussPy phase-two decomposition using the pre-saved spectra pickle.
         """
         from gausspy.gp import GaussianDecomposer
-        import pickle
-
-        with open(self.input_pickle, 'rb') as f:
-            d = pickle.load(f)
-
         g = GaussianDecomposer()
         g.set('phase', 'two')
         g.set('alpha1', self.alpha1)
         g.set('alpha2', self.alpha2)
         g.set('SNR_thresh', [self.snr_thresh, self.snr_thresh])
 
-        results = {
-            'amplitudes_fit': [],
-            'means_fit': [],
-            'stddevs_fit': [],
-            'fwhms_fit': [],
-            'aic_fit': [],
-            'bic_fit': [],
-            'N_components': []
-        }
-
-        for idx in range(len(d['x_values'])):
-            test_one = {
-                'x_values': [d['x_values'][idx]],
-                'data_list': [d['data_list'][idx]],
-                'errors': [d['errors'][idx]]
-            }
-            pickle.dump(test_one, open('test_one_spec.pickle', 'wb'))
-            try:
-                result = g.batch_decomposition('test_one_spec.pickle')
-                results['amplitudes_fit'].append(result['amplitudes_fit'][0])
-                results['means_fit'].append(result['means_fit'][0])
-                results['stddevs_fit'].append(result['stddevs_fit'][0])
-                results['fwhms_fit'].append(result['fwhms_fit'][0])
-                results['aic_fit'].append(result['aic_fit'][0])
-                results['bic_fit'].append(result['bic_fit'][0])
-                results['N_components'].append(result['N_components'][0])
-            except Exception as e:
-                print(f"   --> ERROR: {e} (spectrum #{idx})")
-                results['amplitudes_fit'].append(None)
-                results['means_fit'].append(None)
-                results['stddevs_fit'].append(None)
-                results['fwhms_fit'].append(None)
-                results['aic_fit'].append(None)
-                results['bic_fit'].append(None)
-                results['N_components'].append(0)
+        print("Running GaussPy phase-two decomposition ...")
+        result = g.batch_decomposition(self.input_pickle)
 
         with open(self.result_pickle, 'wb') as f:
-            pickle.dump(results, f)
+            pickle.dump(result, f)
 
         print(f"GaussPy decomposition finished → {self.result_pickle}")
-        print(f"Fit spectra: {len(results['amplitudes_fit'])} / {len(d['x_values'])}")
+        print(f"Result keys: {list(result.keys())}")
+    
 
 
     def count_fits(self):
@@ -197,20 +140,25 @@ class GausspyPipeline:
         分類所有 pixel 的高斯擬合結果為單峰、多峰、失敗
         並儲存 index, location, amps, means, sigmas
         """
+        import pickle
         with open(self.input_pickle, 'rb') as f:
             data = pickle.load(f)
         with open(self.result_pickle, 'rb') as f:
             result = pickle.load(f)
 
         fit_result_dic = {'s':[], 'm':[], 'f':[]}
+        fwhm2sigma = lambda fwhm: np.array(fwhm) / 2.35482 if fwhm is not None else None
 
-        for i, (loc, amps, means, sigmas) in enumerate(zip(
+        for i, (loc, amps, means, fwhms) in enumerate(zip(
             data['location'],
             result['amplitudes_fit'],
             result['means_fit'],
-            result['stddevs_fit'])):
+            result['fwhms_fit'])):
+
             loc = tuple(loc)
             peak_num = len(means) if means is not None else 0
+            sigmas = fwhm2sigma(fwhms) if fwhms is not None else None
+
             pixel_dict = {
                 "index": i,
                 "location": loc,
@@ -226,11 +174,77 @@ class GausspyPipeline:
             else:
                 fit_result_dic['m'].append(pixel_dict)
 
-        # 儲存到 pickle
         with open(output_pickle, 'wb') as f:
             pickle.dump(fit_result_dic, f)
         print(f"已儲存 fit 結果分類於 {output_pickle}")
         return fit_result_dic
+
+
+    def plot_classified_fits(self, fit_result_pickle='fit_result_dic.pickle', category='s', plot_max=30):
+        """
+        根據分類結果繪圖。category: 's' (單峰), 'm' (多峰), 'f' (失敗)
+        """
+        import pickle
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # 讀取分類後結果
+        with open(fit_result_pickle, 'rb') as f:
+            fit_result_dic = pickle.load(f)
+        # 讀取原始光譜
+        with open(self.input_pickle, 'rb') as f:
+            data = pickle.load(f)
+
+        items = fit_result_dic[category]
+        n_plotted = 0
+
+        for item in items:
+            if plot_max is not None and n_plotted >= plot_max:
+                break
+
+            idx = item['index']
+            amps = item['amps']
+            means = item['means']
+            sigmas = item['sigmas']
+
+            if amps is None or means is None or sigmas is None:
+                continue
+            if len(amps) == 0:
+                continue
+
+            x = data['x_values'][idx]
+            y = data['data_list'][idx]
+
+            fit_total = np.zeros_like(x)
+            gaussians = []
+            for amp, mean, sigma in zip(amps, means, sigmas):
+                gauss = amp * np.exp(-(x - mean) ** 2 / (2 * sigma ** 2))
+                fit_total += gauss
+                gaussians.append((gauss, mean, amp))
+
+            plt.figure(figsize=(10, 4), dpi=self.plot_dpi)
+            plt.plot(x, y, color='black', lw=1, label='Spectrum')
+            plt.plot(x, fit_total, color='red', lw=2, label='Total Fit')
+
+            colors = plt.cm.tab10(np.linspace(0, 1, len(gaussians)))
+            for j, (g, mean, amp) in enumerate(gaussians):
+                plt.plot(x, g, linestyle='--', color=colors[j % 10], alpha=0.8, label=f'Comp {j+1}')
+                plt.axvline(mean, color=colors[j % 10], linestyle='-', linewidth=1)
+                plt.text(mean, amp * 1.05, f'v = {mean:.1f} km/s',
+                        rotation=90, ha='center', va='bottom', fontsize=8,
+                        color=colors[j % 10], backgroundcolor='white')
+
+            plt.title(f'Classified Fit - {category.upper()} (idx={idx})')
+            plt.xlabel('Velocity (km/s)')
+            plt.ylabel('Intensity')
+            plt.grid(True, linestyle=':', alpha=0.5)
+            plt.legend(fontsize=8, loc='upper right')
+            plt.tight_layout()
+            plt.show()
+            n_plotted += 1
+
+        print(f"Plotted {n_plotted} spectra for category '{category}'.")
+
     
     def stack_raw_spectra(self, plot=True):
         """
@@ -259,10 +273,11 @@ class GausspyPipeline:
         print(f"Stacked {len(y_all)} raw spectra.")
         return v_axis, mean_spec, std_spec
 
-    def stack_restframe(self, plot=True):
+
+    def stack_restframe(self, plot=True, full_range=True):
         """
-        Stack all successful spectra by aligning the main component to v=0 km/s.
-        Returns (velocity grid, mean spectrum, std spectrum).
+        疊加所有光譜，並自動產生最完整的 rest-frame 速度軸。
+        full_range=True 代表自動以全部資料的覆蓋範圍產生 v_grid。
         """
         import pickle
         from scipy.interpolate import interp1d
@@ -279,16 +294,20 @@ class GausspyPipeline:
         amps_all = result['amplitudes_fit']
         means_all = result['means_fit']
 
-        v_grid = np.arange(
-            self.stack_vrange[0], self.stack_vrange[1] + self.stack_dv, self.stack_dv
-        )
+        # 決定 v_grid 的範圍
+        if full_range:
+            v_min = np.min([np.nanmin(x) for x in x_all])
+            v_max = np.max([np.nanmax(x) for x in x_all])
+            v_grid = np.arange(v_min, v_max + self.stack_dv, self.stack_dv)
+        else:
+            v_grid = np.arange(self.stack_vrange[0], self.stack_vrange[1] + self.stack_dv, self.stack_dv)
+
         stacked = []
         used_indices = []
 
         for i, (x, y, amps, means) in enumerate(zip(x_all, y_all, amps_all, means_all)):
             if amps is None or len(amps) == 0 or means is None:
                 continue
-
             idx_peak = np.argmax(amps)
             v_peak = means[idx_peak]
             x_shifted = x - v_peak
@@ -325,74 +344,50 @@ class GausspyPipeline:
 
         return v_grid, mean_spec, std_spec
 
-
-    def plot_fits(self):
+    def plot_stacked_zoom(
+        self,
+        v_rest, mean_rest,
+        v_raw, mean_raw,
+        target_freq,
+        freq_raw0,
+        vmin=-50, vmax=50,
+        c=299792.458
+    ):
         """
-        Plot spectra and their fitted Gaussian components.
+        Rest-frame 疊加與原始疊加的對比放大顯示，並標註目標頻率對應速度。
+        v_rest, mean_rest: rest-frame 疊加結果
+        v_raw, mean_raw: 原始疊加結果
+        target_freq: 要標註的頻率 (GHz)
+        freq_raw0: 疊加後主峰頻率 (GHz)
+        vmin, vmax: 欲放大顯示的速度區間
         """
-        with open(self.input_pickle, 'rb') as f:
-            data = pickle.load(f)
-        with open(self.result_pickle, 'rb') as f:
-            result = pickle.load(f)
+        peak_idx = np.nanargmax(mean_raw)
+        v_peak_raw = v_raw[peak_idx]
+        v_raw_aligned = v_raw - v_peak_raw
 
-        x_all = data['x_values']
-        y_all = data['data_list']
-        amps_all = result['amplitudes_fit']
-        means_all = result['means_fit']
-        fwhms_all = result['fwhms_fit']
+        v_target_raw = c * (1 - target_freq / freq_raw0)
+        v_target_raw_aligned = v_target_raw - v_peak_raw
 
-        n_result = len(amps_all)
-        n_data = len(y_all)
-        n_total = min(n_result, n_data)
-        n_plotted = 0
+        mask_rest = (v_rest >= vmin) & (v_rest <= vmax)
+        mask_raw = (v_raw_aligned >= vmin) & (v_raw_aligned <= vmax)
 
-        for i in range(n_total):
-            if self.plot_max is not None and n_plotted >= self.plot_max:
-                break
+        plt.figure(figsize=(10, 5))
+        plt.plot(v_raw_aligned[mask_raw], mean_raw[mask_raw],
+                label='Raw Stacked Spectrum (Aligned)', color='gray', linewidth=1.5)
+        plt.plot(v_rest[mask_rest], mean_rest[mask_rest],
+                label='Rest-frame Stacked Spectrum', color='black', linewidth=2)
+        plt.axvline(0, linestyle='--', color='red', label='Aligned Main Peak (v=0 km/s)')
+        plt.axvline(v_target_raw_aligned, linestyle='--', color='orange',
+                    label=f'{target_freq:.3f} GHz ({v_target_raw_aligned:.1f} km/s)')
+        plt.xlabel('Velocity (km/s)')
+        plt.ylabel('Stacked Intensity')
+        plt.title(f'Zoomed Stacked Spectrum ({vmin} ~ {vmax} km/s)')
+        plt.legend()
+        plt.grid(True, linestyle=':')
+        plt.tight_layout()
+        plt.xlim(vmin, vmax)
+        plt.show()
 
-            amps = amps_all[i]
-            means = means_all[i]
-            fwhms = fwhms_all[i]
-
-            if amps is None or len(amps) == 0:
-                continue
-
-            x = x_all[i]
-            y = y_all[i]
-            stddevs = fwhms / (2 * np.sqrt(2 * np.log(2)))
-
-            fit_total = np.zeros_like(x)
-            gaussians = []
-
-            for amp, mean, std in zip(amps, means, stddevs):
-                gauss = amp * np.exp(-(x - mean)**2 / (2 * std**2))
-                fit_total += gauss
-                gaussians.append((gauss, mean, amp))
-
-            plt.figure(figsize=(10, 4), dpi=self.plot_dpi)
-            plt.plot(x, y, color='black', lw=1, label='Spectrum')
-            plt.plot(x, fit_total, color='red', lw=2, label='Total Fit')
-
-            colors = plt.cm.tab10(np.linspace(0, 1, len(gaussians)))
-
-            for j, (g, mean, amp) in enumerate(gaussians):
-                plt.plot(x, g, linestyle='--', color=colors[j % 10], alpha=0.8, label=f'Comp {j+1}')
-                plt.axvline(mean, color=colors[j % 10], linestyle='-', linewidth=1)
-                plt.text(mean, amp * 1.05, f'v = {mean:.1f} km/s',
-                         rotation=90, ha='center', va='bottom', fontsize=8,
-                         color=colors[j % 10], backgroundcolor='white')
-
-            plt.title(f'Gaussian Fit - Spectrum #{i}')
-            plt.xlabel('Velocity (km/s)')
-            plt.ylabel('Intensity')
-            plt.grid(True, linestyle=':', alpha=0.5)
-            plt.legend(fontsize=8, loc='upper right')
-            plt.tight_layout()
-            plt.show()
-
-            n_plotted += 1
-
-        print(f"Plotted {n_plotted} fitted spectra.")
 
     def config(self):
         """
