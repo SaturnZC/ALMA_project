@@ -1,0 +1,5 @@
+- 2025/5/29 
+    - upgrade gausspy pipeline
+	- add pixel location to pickle
+	- there is a GaussPy batch bug, we can't decomposition serval spctrum together on my windows pc, haven't try run it on server yet.
+	- 
