@@ -4,3 +4,7 @@
 datacubes/
 stack_spectrum/spectrum_for_gausspy.pickle
 stack_spectrum/gausspy_result.pickle
+*.pickle
+*.tmp
+*.log
+__pycache__/
