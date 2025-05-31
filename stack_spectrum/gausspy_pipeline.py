@@ -1,8 +1,11 @@
+import re
+import os
 import numpy as np
 import pickle
 from astropy.io import fits
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+
 
 class GausspyPipeline:
     """
@@ -12,40 +15,48 @@ class GausspyPipeline:
     """
 
     def __init__(
-        self,
-        cube_file,
-        v1, v2, x1, x2, y1, y2,
-        input_pickle='spectrum_for_gausspy.pickle',
-        result_pickle='gausspy_result.pickle',
-        alpha1=0.1,
-        alpha2=12.0,
-        snr_thresh=3.0,
-        plot_max=100,
-        plot_dpi=100,
-        stack_vrange=(-500, 500),
-        stack_dv=0.2,
-        normalize=False,
-        min_valid_spectra=30
-    ):
-        self.cube_file = cube_file
-        self.v1, self.v2 = v1, v2
-        self.x1, self.x2 = x1, x2
-        self.y1, self.y2 = y1, y2
-        self.input_pickle = input_pickle
-        self.result_pickle = result_pickle
-        self.alpha1 = alpha1
-        self.alpha2 = alpha2
-        self.snr_thresh = snr_thresh
-        self.plot_max = plot_max
-        self.plot_dpi = plot_dpi
-        self.stack_vrange = stack_vrange
-        self.stack_dv = stack_dv
-        self.normalize = normalize
-        self.min_valid_spectra = min_valid_spectra
+            self,
+            cube_file,
+            v1, v2, x1, x2, y1, y2,
+            input_pickle=None,
+            result_pickle=None,
+            alpha1=0.1,
+            alpha2=12.0,
+            snr_thresh=3.0,
+            plot_max=100,
+            plot_dpi=100,
+            stack_vrange=(-500, 500),
+            stack_dv=0.2,
+            normalize=False,
+            min_valid_spectra=30
+        ):
+            self.cube_file = cube_file
+            self.v1, self.v2 = v1, v2
+            self.x1, self.x2 = x1, x2
+            self.y1, self.y2 = y1, y2
 
-        # 自動擷取 RESTFREQ（如 header 沒有則為 None）
-        header = fits.getheader(cube_file)
-        self.restfreq = header.get('RESTFREQ', None)
+            # ==== 自動判斷 spw 編號（可支援路徑內 spwN 或 spw_N）====
+            basename = os.path.basename(cube_file)
+            m = re.search(r'spw[_]?(\d+)', basename)
+            spw_tag = f"spw{m.group(1)}" if m else "spw"
+
+            # ==== input/result pickle 根據 spw 編號自動命名（除非手動覆蓋）====
+            self.input_pickle = input_pickle or f"spectrum_for_gausspy_{spw_tag}.pickle"
+            self.result_pickle = result_pickle or f"gausspy_result_{spw_tag}.pickle"
+
+            self.alpha1 = alpha1
+            self.alpha2 = alpha2
+            self.snr_thresh = snr_thresh
+            self.plot_max = plot_max
+            self.plot_dpi = plot_dpi
+            self.stack_vrange = stack_vrange
+            self.stack_dv = stack_dv
+            self.normalize = normalize
+            self.min_valid_spectra = min_valid_spectra
+
+            # 自動擷取 RESTFREQ
+            header = fits.getheader(cube_file)
+            self.restfreq = header.get('RESTFREQ', None)
 
     def prepare_input(self):
         """
