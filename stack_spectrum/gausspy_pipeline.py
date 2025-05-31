@@ -388,6 +388,52 @@ class GausspyPipeline:
         plt.xlim(vmin, vmax)
         plt.show()
 
+    def plot_lines_on_stack(self, v_grid, mean_spec, line_dict, restfreq=None, label_offset=0.02):
+        """
+        疊加光譜自動標註多個分子線。
+        v_grid：疊加後的速度軸
+        mean_spec：疊加後的光譜
+        line_dict：{'分子名': 頻率GHz, ...}
+        restfreq：主峰基準 rest frequency（GHz），預設取 self.restfreq
+        """
+        c = 299792.458  # km/s
+
+        # 選定 rest frequency（如果沒給就用 self.restfreq）
+        if restfreq is None:
+            if hasattr(self, "restfreq"):
+                restfreq = self.restfreq
+            else:
+                raise ValueError("請指定 restfreq 或於 class 中設定 self.restfreq。")
+
+        # 主峰對齊（rest-frame）
+        peak_idx = np.nanargmax(mean_spec)
+        v_peak = v_grid[peak_idx]
+        v_aligned = v_grid - v_peak
+
+        plt.figure(figsize=(12,5))
+        plt.plot(v_aligned, mean_spec, lw=1.5, label='Stacked Spectrum', color='black')
+        plt.axvline(0, ls='--', color='red', label='Main peak (v=0)')
+
+        y_max = np.nanmax(mean_spec)
+        for name, freq in line_dict.items():
+            v_target = c * (1 - freq / restfreq)
+            v_target_aligned = v_target - v_peak
+            plt.axvline(v_target_aligned, ls=':', color='blue', alpha=0.7)
+            plt.text(v_target_aligned, y_max * (1-label_offset), f"{name}\n{freq:.3f}GHz",
+                     rotation=90, va='top', ha='center', fontsize=10, color='blue')
+        
+        plt.xlabel("Rest-frame Velocity (km/s)")
+        plt.ylabel("Stacked Intensity")
+        plt.title("Rest-frame Stacked Spectrum with Line Labels")
+        
+        plt.legend()
+        plt.grid(True, ls=':')
+        plt.tight_layout()
+        plt.show()
+
+        # 回傳每條線的 rest-frame 位置
+        return {name: c * (1 - freq / restfreq) - v_peak for name, freq in line_dict.items()}
+
 
     def config(self):
         """
