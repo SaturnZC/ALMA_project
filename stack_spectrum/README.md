@@ -4,11 +4,11 @@ This project uses the `gausspy` package to perform Gaussian fitting, identify pe
   
 ---
 # Instruction  
-Ensure that all necessary dependencies are installed. For easier installation, a `requirements.txt` file is provided. Before installation, use Anaconda3 to manage the development environment. You can type:
+Ensure that all necessary dependencies are installed. For easier installation, a `environment.yml` file is provided. Before installation, use Anaconda3 to manage the development environment. You can type:
 
 ```bash
-conda create --name astroimgAna python=3.7
-conda activate astroimgAna
+conda env create -f environment.yml
+conda activate gausspy
 pip install --upgrade pip
 pip install numpy scipy pandas matplotlib
 pip install astropy==4.3.1
