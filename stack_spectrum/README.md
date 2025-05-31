@@ -30,7 +30,7 @@ from astropy.io import fits
 
 pipeline = GausspyPipeline(
     cube_file='../datacubes/spw0.fits', #your fits file
-    v1=10, v2=1500, x1=190, x2=210, y1=220, y2=240, # v : frequency:cahnnel, (x,y) : pixel index 
+    v1=10, v2=1500, x1=190, x2=210, y1=220, y2=240, # v : frequency cahnnel, (x,y) : pixel index 
     alpha1=0.1, alpha2=12.0, snr_thresh=3.0, #alpha: train parameter
     stack_vrange=(-200, 200), stack_dv=0.2
 )
