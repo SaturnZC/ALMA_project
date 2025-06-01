@@ -39,7 +39,10 @@ pipeline = GausspyPipeline(
 
 ---
 # Log  
-  
+- 2025-06-01
+	- `stack_restframe` now allows setting a `v_range` (velocity range) to stack the spectrum of the main peak located within the specified range. For example, you can use `v_range=(-90, -100)` to stack the spectrum of peaks within a velocity range of -90 to -100 km/s.  
+	- `gausspy_decomp_linux.py` can work on linux server to do the decomposition. 
+	- `classify_fit_results` adds a function to filter out anomalous peaks.
 - 2025-05-31
 	- add a dic to sort the single peak , multiple peak, failed peak
 	- add a function `plot_stacked_zoom` to plot the compare of stack rest frame and raw more easier.  
