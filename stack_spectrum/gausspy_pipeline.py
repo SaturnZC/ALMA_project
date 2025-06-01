@@ -150,6 +150,7 @@ class GausspyPipeline:
         """
         分類所有 pixel 的高斯擬合結果為單峰、多峰、失敗
         並儲存 index, location, amps, means, sigmas
+        只要有任何一個分量中心位置超過 ±3000 km/s，就直接踢掉這條光譜。
         """
         import pickle
         with open(self.input_pickle, 'rb') as f:
@@ -160,6 +161,8 @@ class GausspyPipeline:
         fit_result_dic = {'s':[], 'm':[], 'f':[]}
         fwhm2sigma = lambda fwhm: np.array(fwhm) / 2.35482 if fwhm is not None else None
 
+        n_skipped = 0  # 記錄被踢掉的數量
+
         for i, (loc, amps, means, fwhms) in enumerate(zip(
             data['location'],
             result['amplitudes_fit'],
@@ -169,6 +172,13 @@ class GausspyPipeline:
             loc = tuple(loc)
             peak_num = len(means) if means is not None else 0
             sigmas = fwhm2sigma(fwhms) if fwhms is not None else None
+
+            # 新增：只要任何一個分量中心超過 ±3000 km/s，就踢掉
+            if means is not None and len(means) > 0:
+                means_arr = np.array(means)
+                if np.any(np.abs(means_arr) > 3000):
+                    n_skipped += 1
+                    continue
 
             pixel_dict = {
                 "index": i,
@@ -188,6 +198,8 @@ class GausspyPipeline:
         with open(output_pickle, 'wb') as f:
             pickle.dump(fit_result_dic, f)
         print(f"已儲存 fit 結果分類於 {output_pickle}")
+        if n_skipped > 0:
+            print(f"已踢除 {n_skipped} 條有分量中心超過 ±3000 km/s 的光譜。")
         return fit_result_dic
 
 
@@ -223,8 +235,24 @@ class GausspyPipeline:
             if len(amps) == 0:
                 continue
 
+             # ====== 加入主峰v條件（假設 means/amps 都有意義）======
+            idx_peak = np.argmax(amps)
+            v_peak = means[idx_peak]
+            if np.abs(v_peak) < -2000 or v_peak > 2000:
+                continue
+
             x = data['x_values'][idx]
             y = data['data_list'][idx]
+            
+            mask = np.isfinite(x) & np.isfinite(y)
+
+            x = x[mask]
+            y = y[mask]
+
+            if len(x) < 3:
+                print(f"警告：第 {idx} 條光譜全為 nan/inf 或長度過短，已略過")
+                continue
+
 
             fit_total = np.zeros_like(x)
             gaussians = []
@@ -233,7 +261,7 @@ class GausspyPipeline:
                 fit_total += gauss
                 gaussians.append((gauss, mean, amp))
 
-            plt.figure(figsize=(10, 4), dpi=self.plot_dpi)
+            plt.figure(figsize=(10, 5), dpi=self.plot_dpi)
             plt.plot(x, y, color='black', lw=1, label='Spectrum')
             plt.plot(x, fit_total, color='red', lw=2, label='Total Fit')
 
@@ -285,10 +313,80 @@ class GausspyPipeline:
         return v_axis, mean_spec, std_spec
 
 
-    def stack_restframe(self, plot=True, full_range=True):
+    # def stack_restframe(self, plot=True, full_range=True):
+    #     """
+    #     疊加所有光譜，並自動產生最完整的 rest-frame 速度軸。
+    #     full_range=True 代表自動以全部資料的覆蓋範圍產生 v_grid。
+    #     """
+    #     import pickle
+    #     from scipy.interpolate import interp1d
+    #     import numpy as np
+    #     import matplotlib.pyplot as plt
+
+    #     with open(self.input_pickle, 'rb') as f:
+    #         data = pickle.load(f)
+    #     with open(self.result_pickle, 'rb') as f:
+    #         result = pickle.load(f)
+
+    #     x_all = data['x_values']
+    #     y_all = data['data_list']
+    #     amps_all = result['amplitudes_fit']
+    #     means_all = result['means_fit']
+
+    #     # 決定 v_grid 的範圍
+    #     if full_range:
+    #         v_min = np.min([np.nanmin(x) for x in x_all])
+    #         v_max = np.max([np.nanmax(x) for x in x_all])
+    #         v_grid = np.arange(v_min, v_max + self.stack_dv, self.stack_dv)
+    #     else:
+    #         v_grid = np.arange(self.stack_vrange[0], self.stack_vrange[1] + self.stack_dv, self.stack_dv)
+
+    #     stacked = []
+    #     used_indices = []
+
+    #     for i, (x, y, amps, means) in enumerate(zip(x_all, y_all, amps_all, means_all)):
+    #         if amps is None or len(amps) == 0 or means is None:
+    #             continue
+    #         idx_peak = np.argmax(amps)
+    #         v_peak = means[idx_peak]
+    #         x_shifted = x - v_peak
+
+    #         try:
+    #             f_interp = interp1d(x_shifted, y, kind='linear', bounds_error=False, fill_value=np.nan)
+    #             y_interp = f_interp(v_grid)
+    #             if self.normalize:
+    #                 y_interp = y_interp / np.nanmax(np.abs(y_interp))
+    #             stacked.append(y_interp)
+    #             used_indices.append(i)
+    #         except Exception:
+    #             continue
+
+    #     stacked = np.array(stacked)
+    #     mean_spec = np.nanmean(stacked, axis=0)
+    #     std_spec = np.nanstd(stacked, axis=0)
+
+    #     if plot:
+    #         plt.figure(figsize=(10, 4))
+    #         plt.plot(v_grid, mean_spec, label='Stacked Spectrum', color='black')
+    #         plt.axvline(0, linestyle='--', color='red', label='v = 0 km/s')
+    #         plt.xlabel('Rest-frame Velocity (km/s)')
+    #         plt.ylabel('Stacked Intensity')
+    #         plt.title('Rest-frame Stacked Spectrum')
+    #         plt.grid(True, linestyle=':')
+    #         plt.legend()
+    #         plt.tight_layout()
+    #         plt.show()
+
+    #     n_total = len(x_all)
+    #     n_used = len(used_indices)
+    #     print(f'Stacking done: {n_used}/{n_total} spectra used ({100 * n_used / n_total:.1f}%)')
+
+    #     return v_grid, mean_spec, std_spec
+
+    def stack_restframe(self, plot=True, full_range=True, peak_range=None):
         """
-        疊加所有光譜，並自動產生最完整的 rest-frame 速度軸。
-        full_range=True 代表自動以全部資料的覆蓋範圍產生 v_grid。
+        疊加所有光譜（主峰中心可用 peak_range 篩選），自動產生最大 rest-frame 速度軸。
+        peak_range: tuple (vmin, vmax)，僅主峰中心落在此範圍的光譜會被納入
         """
         import pickle
         from scipy.interpolate import interp1d
@@ -300,12 +398,29 @@ class GausspyPipeline:
         with open(self.result_pickle, 'rb') as f:
             result = pickle.load(f)
 
-        x_all = data['x_values']
-        y_all = data['data_list']
-        amps_all = result['amplitudes_fit']
-        means_all = result['means_fit']
+        x_all = np.array(data['x_values'])
+        y_all = np.array(data['data_list'])
+        amps_all = np.array(result['amplitudes_fit'], dtype=object)
+        means_all = np.array(result['means_fit'], dtype=object)
 
-        # 決定 v_grid 的範圍
+        # 計算每個主峰位置
+        v_peak_arr = np.array([
+            means[np.argmax(amps)] if (amps is not None and len(amps) > 0 and means is not None) else np.nan
+            for amps, means in zip(amps_all, means_all)
+        ])
+
+        # 製作 mask：peak_range 若沒給則全選，有給則依範圍挑選
+        if peak_range is not None:
+            mask = (~np.isnan(v_peak_arr)) & (v_peak_arr >= peak_range[0]) & (v_peak_arr <= peak_range[1])
+        else:
+            mask = ~np.isnan(v_peak_arr)
+
+        # 只留下有用的 spectra
+        x_all = x_all[mask]
+        y_all = y_all[mask]
+        v_peak_arr = v_peak_arr[mask]
+
+        # 設定疊加用的 v_grid
         if full_range:
             v_min = np.min([np.nanmin(x) for x in x_all])
             v_max = np.max([np.nanmax(x) for x in x_all])
@@ -314,22 +429,15 @@ class GausspyPipeline:
             v_grid = np.arange(self.stack_vrange[0], self.stack_vrange[1] + self.stack_dv, self.stack_dv)
 
         stacked = []
-        used_indices = []
 
-        for i, (x, y, amps, means) in enumerate(zip(x_all, y_all, amps_all, means_all)):
-            if amps is None or len(amps) == 0 or means is None:
-                continue
-            idx_peak = np.argmax(amps)
-            v_peak = means[idx_peak]
+        for x, y, v_peak in zip(x_all, y_all, v_peak_arr):
             x_shifted = x - v_peak
-
             try:
                 f_interp = interp1d(x_shifted, y, kind='linear', bounds_error=False, fill_value=np.nan)
                 y_interp = f_interp(v_grid)
                 if self.normalize:
                     y_interp = y_interp / np.nanmax(np.abs(y_interp))
                 stacked.append(y_interp)
-                used_indices.append(i)
             except Exception:
                 continue
 
@@ -349,11 +457,14 @@ class GausspyPipeline:
             plt.tight_layout()
             plt.show()
 
-        n_total = len(x_all)
-        n_used = len(used_indices)
+        n_total = len(result['amplitudes_fit'])
+        n_used = mask.sum()
         print(f'Stacking done: {n_used}/{n_total} spectra used ({100 * n_used / n_total:.1f}%)')
+        if peak_range is not None:
+            print(f"（僅納入主峰在 {peak_range[0]} ~ {peak_range[1]} km/s 的光譜）")
 
         return v_grid, mean_spec, std_spec
+
 
     def plot_stacked_zoom(
         self,
