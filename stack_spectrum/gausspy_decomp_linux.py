@@ -15,23 +15,23 @@ pipeline = GausspyPipeline(
 # transform the fits cube to gausspy format
 pipeline.prepare_input()
 
-d = pickle.load(open('spectrum_for_gausspy.pickle', 'rb'))
-print(d.keys())
-print(len(d['x_values']), len(d['data_list']), len(d['errors']))
-print(type(d['x_values'][0]), type(d['data_list'][0]), type(d['errors'][0]))
-print(d['x_values'][0].shape, d['data_list'][0].shape, d['errors'][0].shape)
+# d = pickle.load(open('spectrum_for_gausspy.pickle', 'rb'))
+# print(d.keys())
+# print(len(d['x_values']), len(d['data_list']), len(d['errors']))
+# print(type(d['x_values'][0]), type(d['data_list'][0]), type(d['errors'][0]))
+# print(d['x_values'][0].shape, d['data_list'][0].shape, d['errors'][0].shape)
 
-for i, spec in enumerate(d['data_list']):
-    if np.any(np.isnan(spec)):
-        print(f"Spectrum {i} 有 NaN！")
-    elif np.any(np.isinf(spec)):
-        print(f"Spectrum {i} 有 Inf！")
-    elif np.all(spec == 0):
-        print(f"Spectrum {i} 全部為 0！")
-    elif len(spec) == 0:
-        print(f"Spectrum {i} 長度為 0！")
-    elif not np.issubdtype(spec.dtype, np.floating):
-        print(f"Spectrum {i} 不是 float 類型！")
+# for i, spec in enumerate(d['data_list']):
+#     if np.any(np.isnan(spec)):
+#         print(f"Spectrum {i} 有 NaN！")
+#     elif np.any(np.isinf(spec)):
+#         print(f"Spectrum {i} 有 Inf！")
+#     elif np.all(spec == 0):
+#         print(f"Spectrum {i} 全部為 0！")
+#     elif len(spec) == 0:
+#         print(f"Spectrum {i} 長度為 0！")
+#     elif not np.issubdtype(spec.dtype, np.floating):
+#         print(f"Spectrum {i} 不是 float 類型！")
 
 
 # 2. Decomposition
